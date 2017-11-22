@@ -33,5 +33,19 @@ namespace Maori.Implementations
             get => Pixels[x + y * Width];
             set => Pixels[x + y * Width] = value;
         }
+
+        public void ConvertToGrayscale()
+        {
+            for (var i = 0; i < Pixels.Length; i++)
+            {
+                Pixel p = Pixels[i];
+                var gray = (byte) ((p.R + p.G + p.B) / 3);
+                p.R = gray;
+                p.G = gray;
+                p.B = gray;
+
+                Pixels[i] = p;
+            }
+        }
     }
 }

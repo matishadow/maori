@@ -2,6 +2,6 @@
 {
     public interface IMaoriBitmap : IDirectBitmap
     {
-        
+        void ConvertToGrayscale();
     }
 }
