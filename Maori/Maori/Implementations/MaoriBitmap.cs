@@ -7,6 +7,8 @@ namespace Maori.Implementations
 {
     public class MaoriBitmap : DirectBitmap
     {
+        public Pixel[] Pixels { get; protected set; }
+
         public MaoriBitmap(int width, int height) : base(width, height)
         {
         }
@@ -15,8 +17,8 @@ namespace Maori.Implementations
         {
             Width = image.Width;
             Height = image.Height;
-            Bits = new byte[Width * Height * 4];
-            BitsHandle = GCHandle.Alloc(Bits, GCHandleType.Pinned);
+            Pixels = new Pixel[Width * Height];
+            BitsHandle = GCHandle.Alloc(Pixels, GCHandleType.Pinned);
             Bitmap = new Bitmap(Width, Height, Width * 4, PixelFormat.Format32bppPArgb,
                 BitsHandle.AddrOfPinnedObject());
 
@@ -26,10 +28,10 @@ namespace Maori.Implementations
             }
         }
 
-        public byte this[int x, int y]
+        public Pixel this[int x, int y]
         {
-            get => Bits[x + y * Width];
-            set => Bits[x + y * Width] = value;
+            get => Pixels[x + y * Width];
+            set => Pixels[x + y * Width] = value;
         }
     }
 }
