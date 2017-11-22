@@ -25,5 +25,11 @@ namespace Maori.Implementations
                 g.DrawImage(image, new Rectangle(Point.Empty, Bitmap.Size));
             }
         }
+
+        public byte this[int x, int y]
+        {
+            get => Bits[x + y * Width];
+            set => Bits[x + y * Width] = value;
+        }
     }
 }
