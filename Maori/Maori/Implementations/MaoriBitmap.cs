@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Maori.Interfaces;
 
@@ -54,6 +55,82 @@ namespace Maori.Implementations
 
                 Pixels[i] = p;
             }
+        }
+
+        public MaoriBitmap GaussianBlur(int kernelSize, double ro)
+        {
+            var kernel = new double[kernelSize, kernelSize];
+            int center = kernelSize / 2;
+
+            for (var i = 0; i < kernelSize; i++)
+            {
+                for (var j = 0; j < kernelSize; j++)
+                {
+                    kernel[i, j] = CalculateGaussianValue(
+                        DistanceFromCenter(center, i), 
+                        DistanceFromCenter(center, j), ro);
+                } 
+            }
+            double sum = kernel.Cast<double>().Sum();
+
+            for (int i = 0; i < kernelSize; i++)
+            {
+                for (int j = 0; j < kernelSize; j++)
+                {
+                    kernel[i, j] = kernel[i, j] * (1 / sum);
+                }
+            }
+
+            return ApplyKernel(kernel);
+        }
+
+        private int DistanceFromCenter(int center, int place)
+        {
+            return Math.Abs(center - place);
+        }
+
+        private double CalculateGaussianValue(int x, int y, double ro)
+        {
+            double fraction = 1 / (2 * Math.PI * ro * ro);
+            double exponential = -(x * x + y * y) / (2 * ro * ro);
+
+            return  (fraction * Math.Exp(exponential));
+        }
+
+        public MaoriBitmap ApplyKernel(double[,] kernel)
+        {
+            var bitmap = new MaoriBitmap(Width, Height);
+            int kernelSize = kernel.GetLength(0);
+            int pixelsToSkip = kernelSize / 2;
+            double totalValueKernel = kernel.Cast<double>().Sum();
+
+            for (int i = 0 + pixelsToSkip; i < Width - pixelsToSkip; i++)
+            {
+                for (int j = 0 + pixelsToSkip; j < Height - pixelsToSkip; j++)
+                {
+                    double sumR = 0;
+                    double sumG = 0;
+                    double sumB = 0;
+
+
+                    for (var k = 0; k < kernelSize; k++)
+                    {
+                        for (var l = 0; l < kernelSize; l++)
+                        {
+                            sumR += this[i - pixelsToSkip + k, j - pixelsToSkip + l].R * kernel[k, l];
+                            sumG += this[i - pixelsToSkip + k, j - pixelsToSkip + l].G * kernel[k, l];
+                            sumB += this[i - pixelsToSkip + k, j - pixelsToSkip + l].B * kernel[k, l];
+                        }
+                    }
+
+                    bitmap.Pixels[i + j * Width].R = (byte)(sumR / totalValueKernel);
+                    bitmap.Pixels[i + j * Width].G = (byte)(sumG / totalValueKernel);
+                    bitmap.Pixels[i + j * Width].B = (byte)(sumB / totalValueKernel);
+                    bitmap.Pixels[i + j * Width].A = byte.MaxValue;
+                }
+            }
+
+            return bitmap;
         }
 
         public MaoriBitmap ApplyKernel2D(double[,] kernelX, double[,] kernelY)
