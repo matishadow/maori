@@ -133,7 +133,7 @@ namespace Maori.Implementations
             return bitmap;
         }
 
-        public MaoriBitmap ApplyKernel2D(double[,] kernelX, double[,] kernelY)
+        public MaoriBitmap ApplyKernel2D(double[,] kernelX, double[,] kernelY, bool drawAngle)
         {
             var bitmap = new MaoriBitmap(Width, Height);
             int kernelSize = kernelX.GetLength(0);
@@ -158,14 +158,72 @@ namespace Maori.Implementations
                     var intSum = (int)Math.Sqrt(sumX * sumX + sumY * sumY);
                     byte byteSaturatedSum = intSum > byte.MaxValue ? byte.MaxValue : (byte)intSum;
 
-                    bitmap.Pixels[i + j * Width].R = byteSaturatedSum;
-                    bitmap.Pixels[i + j * Width].G = byteSaturatedSum;
-                    bitmap.Pixels[i + j * Width].B = byteSaturatedSum;
+                    double angle = Math.Atan2(sumX, sumY) + Math.PI;
+                    HsVtoRgb(angle, 1, (double)byteSaturatedSum / byte.MaxValue, out byte r, out byte g, out byte b);
+
+                    bitmap.Pixels[i + j * Width].R = drawAngle ? r : byteSaturatedSum;
+                    bitmap.Pixels[i + j * Width].G = drawAngle ? g : byteSaturatedSum;
+                    bitmap.Pixels[i + j * Width].B = drawAngle ? b : byteSaturatedSum;
                     bitmap.Pixels[i + j * Width].A = byte.MaxValue;
                 }
             }
 
             return bitmap;
+        }
+
+        private void HsVtoRgb(double hue, double saturation, double value, out byte r, out byte g, out byte b)
+        {
+            double h_ = hue / (2 * Math.PI) * 6;
+
+            double c = saturation * value;
+            double x = c * (1 - Math.Abs((h_ % 2) - 1));
+            double r_, g_, b_;
+            if (h_ < 1)
+            {
+                r_ = c;
+                g_ = x;
+                b_ = 0;
+            }
+            else if (h_ < 2)
+            {
+                r_ = x;
+                g_ = c;
+                b_ = 0;
+            }
+            else if (h_ < 3)
+            {
+                r_ = 0;
+                g_ = c;
+                b_ = x;
+            }
+            else if (h_ < 4)
+            {
+                r_ = 0;
+                g_ = x;
+                b_ = c;
+            }
+            else if (h_ < 5)
+            {
+                r_ = x;
+                g_ = 0;
+                b_ = c;
+            }
+            else
+            {
+                r_ = c;
+                g_ = 0;
+                b_ = x;
+            }
+
+            double m = value - c;
+
+            r_ += m;
+            g_ += m;
+            b_ += m;
+
+            r = (byte)(r_ * byte.MaxValue);
+            g = (byte)(g_ * byte.MaxValue);
+            b = (byte)(b_ * byte.MaxValue);
         }
     }
 }
