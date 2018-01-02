@@ -1,10 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media.Imaging;
 using Maori.Interfaces;
+using Point = System.Drawing.Point;
 
 namespace Maori.Implementations
 {
@@ -21,11 +26,58 @@ namespace Maori.Implementations
                 BitsHandle.AddrOfPinnedObject());
         }
 
+        public BitmapImage ToWpfImage()
+        {
+            var ms = new MemoryStream();
+            Bitmap.Save(ms, ImageFormat.Bmp);
+            var image = new BitmapImage();
+            image.BeginInit();
+            ms.Seek(0, SeekOrigin.Begin);
+            image.StreamSource = ms;
+            image.EndInit();
+            return image;
+        }
+
+        public static MaoriBitmap FromWpfImage(BitmapSource image, IColorSpaceConverter colorSpaceConverter)
+        {
+            var bmp = new Bitmap(
+                image.PixelWidth,
+                image.PixelHeight,
+                PixelFormat.Format32bppPArgb);
+            BitmapData data = bmp.LockBits(
+                new Rectangle(Point.Empty, bmp.Size),
+                ImageLockMode.WriteOnly,
+                PixelFormat.Format32bppPArgb);
+            image.CopyPixels(
+                Int32Rect.Empty,
+                data.Scan0,
+                data.Height * data.Stride,
+                data.Stride);
+            bmp.UnlockBits(data);
+            return new MaoriBitmap(bmp, colorSpaceConverter);
+        }
+
         public MaoriBitmap(int width, int height, IColorSpaceConverter colorSpaceConverter) 
             : base(width, height)
         {
             this.colorSpaceConverter = colorSpaceConverter;
             CreatePixels();
+        }
+
+        public MaoriBitmap ConvertToEdgesSobel(bool showAngle = false)
+        {
+            double[,] xKernel = {
+                {-1, 0, 1},
+                {-2, 0, 2},
+                {-1, 0, 1}
+            };
+            double[,] yKernel = {
+                {-1, -2, -1},
+                {0, 0, 0},
+                {1, 2, 1}
+            };
+
+            return ApplyKernel2D(xKernel, yKernel, showAngle);
         }
 
         public MaoriBitmap(Image image, IColorSpaceConverter colorSpaceConverter)
@@ -50,44 +102,34 @@ namespace Maori.Implementations
 
         public void ConvertToGrayscale()
         {
-            for (var i = 0; i < Pixels.Length; i++)
+            Parallel.For(0, Pixels.Length, i =>
             {
                 Pixel p = Pixels[i];
-                var gray = (byte) ((p.R + p.G + p.B) / 3);
+                var gray = (byte)((p.R + p.G + p.B) / 3);
                 p.R = gray;
                 p.G = gray;
                 p.B = gray;
 
                 Pixels[i] = p;
-            }
+            });
         }
 
-        public MaoriBitmap DrawLine(int r, double theta)
+        public void ConvertToBinary(double threshold)
         {
-            var bitmap = new MaoriBitmap(Width, Height, colorSpaceConverter);
-            double thetaRad = DegsToRad(theta);
-            double valueCos = Math.Cos(thetaRad);
-            double valueSin = Math.Sin(thetaRad);
+            var blackPixel = new Pixel {A = 255, B = 0, G = 0, R = 0};
+            var whitePixel = new Pixel {A = 255, B = 255, G = 255, R = 255};
+            var thresholdValue = (byte) (255 * threshold);
 
-            var white = new Pixel {A = 255, B = 255, G = 255, R = 255};
-            var black = new Pixel { A = 255, B = 0, G = 0, R = 0 };
 
-            for (int i = 0; i < Width; i++)
+            Parallel.For(0, Pixels.Length, i =>
             {
-                for (int j = 0; j < Height; j++)
-                {
-                    if (r == (int) (i * valueCos + j * valueSin))
-                    {
-                        bitmap[i, j] = black;
-                    }
-                    else
-                    {
-                        bitmap[i, j] = white;
-                    }
-                }
-            }
-
-            return bitmap;
+                Pixel p = Pixels[i];
+                double luminance = (0.2126 * p.R + 0.7152 * p.G + 0.0722 * p.B);
+                if (luminance > thresholdValue)
+                    Pixels[i] = whitePixel;
+                else
+                    Pixels[i] = blackPixel;
+            });
         }
 
         public MaoriBitmap GaussianBlur(int kernelSize, double ro)
@@ -137,31 +179,30 @@ namespace Maori.Implementations
             int pixelsToSkip = kernelSize / 2;
             double totalValueKernel = kernel.Cast<double>().Sum();
 
-            for (int i = 0 + pixelsToSkip; i < Width - pixelsToSkip; i++)
+            Parallel.For(0 + pixelsToSkip, Width - pixelsToSkip, i =>
             {
-                for (int j = 0 + pixelsToSkip; j < Height - pixelsToSkip; j++)
+                Parallel.For(0 + pixelsToSkip, Height - pixelsToSkip, j =>
                 {
-                    double sumR = 0;
-                    double sumG = 0;
-                    double sumB = 0;
+                        double sumR = 0;
+                        double sumG = 0;
+                        double sumB = 0;
 
-
-                    for (var k = 0; k < kernelSize; k++)
-                    {
-                        for (var l = 0; l < kernelSize; l++)
+                        for (var k = 0; k < kernelSize; k++)
                         {
-                            sumR += this[i - pixelsToSkip + k, j - pixelsToSkip + l].R * kernel[k, l];
-                            sumG += this[i - pixelsToSkip + k, j - pixelsToSkip + l].G * kernel[k, l];
-                            sumB += this[i - pixelsToSkip + k, j - pixelsToSkip + l].B * kernel[k, l];
+                            for (var l = 0; l < kernelSize; l++)
+                            {
+                                sumR += this[i - pixelsToSkip + k, j - pixelsToSkip + l].R * kernel[k, l];
+                                sumG += this[i - pixelsToSkip + k, j - pixelsToSkip + l].G * kernel[k, l];
+                                sumB += this[i - pixelsToSkip + k, j - pixelsToSkip + l].B * kernel[k, l];
+                            }
                         }
-                    }
 
-                    bitmap.Pixels[i + j * Width].R = (byte)(sumR / totalValueKernel);
-                    bitmap.Pixels[i + j * Width].G = (byte)(sumG / totalValueKernel);
-                    bitmap.Pixels[i + j * Width].B = (byte)(sumB / totalValueKernel);
-                    bitmap.Pixels[i + j * Width].A = byte.MaxValue;
-                }
-            }
+                        bitmap.Pixels[i + j * Width].R = (byte)(sumR / totalValueKernel);
+                        bitmap.Pixels[i + j * Width].G = (byte)(sumG / totalValueKernel);
+                        bitmap.Pixels[i + j * Width].B = (byte)(sumB / totalValueKernel);
+                        bitmap.Pixels[i + j * Width].A = byte.MaxValue;
+                });
+            });
 
             return bitmap;
         }
@@ -172,9 +213,9 @@ namespace Maori.Implementations
             int kernelSize = kernelX.GetLength(0);
             int pixelsToSkip = kernelSize / 2;
 
-            for (int i = 0 + pixelsToSkip; i < Width - pixelsToSkip; i++)
+            Parallel.For(0 + pixelsToSkip, Width - pixelsToSkip, i =>
             {
-                for (int j = 0 + pixelsToSkip; j < Height - pixelsToSkip; j++)
+                Parallel.For(0 + pixelsToSkip, Height - pixelsToSkip, j =>
                 {
                     double sumX = 0;
                     double sumY = 0;
@@ -187,11 +228,8 @@ namespace Maori.Implementations
                             sumY += this[i - pixelsToSkip + k, j - pixelsToSkip + l].R * kernelY[k, l];
                         }
                     }
-                    sumX /= 8;
-                    sumY /= 8;
 
-                    var byteSaturatedSum = (byte)Math.Sqrt(sumX * sumX + sumY * sumY);
-                    //byte byteSaturatedSum = intSum > byte.MaxValue ? byte.MaxValue : (byte)intSum;
+                    var byteSaturatedSum = (byte) Math.Sqrt(sumX * sumX + sumY * sumY);
 
                     double angle = Math.Atan2(sumX, sumY) + Math.PI;
                     colorSpaceConverter
@@ -202,13 +240,13 @@ namespace Maori.Implementations
                     bitmap.Pixels[i + j * Width].G = drawAngle ? g : byteSaturatedSum;
                     bitmap.Pixels[i + j * Width].B = drawAngle ? b : byteSaturatedSum;
                     bitmap.Pixels[i + j * Width].A = byte.MaxValue;
-                }
-            }
+                });
+            });
 
             return bitmap;
         }
 
-        public void DetectCircle()
+        public void DetectCircle(int minR, int maxR)
         {
             var accumulator = new int[Width, Height, Width];
 
@@ -220,17 +258,17 @@ namespace Maori.Implementations
 
                     if (p.R != 255)
                     {
-                        Parallel.For(1, Width, r =>
+                        for (int r = minR; r < maxR; r++)
                         {
-                            Parallel.For(0, 360, t =>
+                            for (int t = 0; t < 360; t++)
                             {
-                                int a = (int) (x - r * Math.Cos(t * Math.PI / 180));
-                                int b = (int) (y - r * Math.Sin(t * Math.PI / 180));
+                                int a = (int)(x - r * Math.Cos(t * Math.PI / 180));
+                                int b = (int)(y - r * Math.Sin(t * Math.PI / 180));
 
                                 if (a > 0 && a < Width && b < Height && b > 0)
                                     accumulator[a, b, r] += 1;
-                            });
-                        });
+                            }
+                        }
                     }
                 });
             });
@@ -258,82 +296,10 @@ namespace Maori.Implementations
                 });
             });
 
-        }
-
-        public void DetectLines()
-        {
-            byte[,] accumulator = CreateAccumulator(Width, Height);
-
-            for (int i = 0; i < Width; i++)
+            using (Graphics g = Graphics.FromImage(Bitmap))
             {
-                for (int j = 0; j < Height; j++)
-                {
-                    byte pixel = this[i, j].R;
-
-                    if (pixel != 255)
-                        DrawSin(i, j, accumulator);
-                }
+                g.DrawEllipse(new Pen(Color.Red, 2), mx - mr, my - mr, 2 * mr, 2 * mr);
             }
-
-            int m = 0;
-            int mi = -1;
-            int mj = -1;
-            for (int i = 0; i < accumulator.GetLength(0); i++)
-            {
-                for (int j = 0; j < accumulator.GetLength(1); j++)
-                {
-                    byte b = accumulator[i, j];
-                    if (b > m)
-                    {
-                        m = b;
-                        mi = i;
-                        mj = j;
-                    }
-                }
-            }
-
-        }
-
-        private int CalculateR(int x, int y, double phi)
-        {
-            double cos = y * Math.Cos(phi);
-            double sin = x * Math.Sin(phi);
-
-            double R = cos + sin;
-
-            return Convert.ToInt32(R);
-        }
-
-        private byte[,] CreateAccumulator(int r, int c)
-        {
-            const int degs = 360;
-            int R = Convert.ToInt32(Math.Sqrt(r * r + c * c));
-
-            var acc = new byte[degs, R];
-
-            return acc;
-        }
-
-        private void DrawSin(int x, int y, byte[,] acc)
-        {
-            int degOffset = -90;
-
-            if (acc == null) return;
-
-            for (int i = 0; i < acc.GetLength(0); i++)
-            {
-                int r = CalculateR(x, y, DegsToRad(i + degOffset));
-
-                if (r < acc.GetLength(1) && r >= 0)
-                    acc[i, r]++;
-            }
-        }
-
-        private double DegsToRad(double angleInDegrees)
-        {
-            double rad = angleInDegrees * (Math.PI / 180.0);
-
-            return rad;
         }
     }
 }

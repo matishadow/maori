@@ -16,11 +16,11 @@ using System.Windows.Shapes;
 namespace Maori.App.Pages
 {
     /// <summary>
-    /// Interaction logic for SettingsPage.xaml
+    /// Interaction logic for Description.xaml
     /// </summary>
-    public partial class SettingsPage : UserControl
+    public partial class Description : UserControl
     {
-        public SettingsPage()
+        public Description()
         {
             InitializeComponent();
         }

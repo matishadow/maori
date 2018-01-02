@@ -13,19 +13,16 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
-namespace Maori.App.Pages.Settings
+namespace Maori.App.Pages
 {
     /// <summary>
-    /// Interaction logic for Appearance.xaml
+    /// Interaction logic for T12.xaml
     /// </summary>
-    public partial class Appearance : UserControl
+    public partial class T12 : UserControl
     {
-        public Appearance()
+        public T12()
         {
             InitializeComponent();
-
-            // create and assign the appearance view model
-            this.DataContext = new AppearanceViewModel();
         }
     }
 }
