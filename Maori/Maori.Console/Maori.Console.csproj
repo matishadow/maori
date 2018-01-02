@@ -4,16 +4,17 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{9FED7724-7C89-4BCD-8453-3F07C0255BEC}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Maori</RootNamespace>
-    <AssemblyName>Maori</AssemblyName>
+    <ProjectGuid>{9A2EB6CE-1FF1-4609-AB8E-63E1CFC9EFCE}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Maori.Console</RootNamespace>
+    <AssemblyName>Maori.Console</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -21,16 +22,15 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -44,17 +44,17 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Implementations\BitmapFileGetter.cs" />
-    <Compile Include="Implementations\ColorSpaceConverter.cs" />
-    <Compile Include="Implementations\DirectBitmap.cs" />
-    <Compile Include="Implementations\MaoriBitmap.cs" />
-    <Compile Include="Interfaces\IBitmapFileGetter.cs" />
-    <Compile Include="Interfaces\IColorSpaceConverter.cs" />
-    <Compile Include="Interfaces\IDirectBitmap.cs" />
-    <Compile Include="Interfaces\IMaoriBitmap.cs" />
-    <Compile Include="Pixel.cs" />
+    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Maori\Maori.csproj">
+      <Project>{9fed7724-7c89-4bcd-8453-3f07c0255bec}</Project>
+      <Name>Maori</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

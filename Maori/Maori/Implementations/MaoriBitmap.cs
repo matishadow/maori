@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Maori.Interfaces;
 
 namespace Maori.Implementations
@@ -59,6 +60,34 @@ namespace Maori.Implementations
 
                 Pixels[i] = p;
             }
+        }
+
+        public MaoriBitmap DrawLine(int r, double theta)
+        {
+            var bitmap = new MaoriBitmap(Width, Height, colorSpaceConverter);
+            double thetaRad = DegsToRad(theta);
+            double valueCos = Math.Cos(thetaRad);
+            double valueSin = Math.Sin(thetaRad);
+
+            var white = new Pixel {A = 255, B = 255, G = 255, R = 255};
+            var black = new Pixel { A = 255, B = 0, G = 0, R = 0 };
+
+            for (int i = 0; i < Width; i++)
+            {
+                for (int j = 0; j < Height; j++)
+                {
+                    if (r == (int) (i * valueCos + j * valueSin))
+                    {
+                        bitmap[i, j] = black;
+                    }
+                    else
+                    {
+                        bitmap[i, j] = white;
+                    }
+                }
+            }
+
+            return bitmap;
         }
 
         public MaoriBitmap GaussianBlur(int kernelSize, double ro)
@@ -179,6 +208,132 @@ namespace Maori.Implementations
             return bitmap;
         }
 
+        public void DetectCircle()
+        {
+            var accumulator = new int[Width, Height, Width];
 
+            Parallel.For(0, Width, x =>
+            {
+                Parallel.For(0, Height, y =>
+                {
+                    var p = this[x, y];
+
+                    if (p.R != 255)
+                    {
+                        Parallel.For(1, Width, r =>
+                        {
+                            Parallel.For(0, 360, t =>
+                            {
+                                int a = (int) (x - r * Math.Cos(t * Math.PI / 180));
+                                int b = (int) (y - r * Math.Sin(t * Math.PI / 180));
+
+                                if (a > 0 && a < Width && b < Height && b > 0)
+                                    accumulator[a, b, r] += 1;
+                            });
+                        });
+                    }
+                });
+            });
+
+            int max = 0;
+            int mx = 0;
+            int my = 0;
+            int mr = 0;
+
+            Parallel.For(0, accumulator.GetLength(0), i =>
+            {
+                Parallel.For(0, accumulator.GetLength(1), j =>
+                {
+                    Parallel.For(0, accumulator.GetLength(2), k =>
+                    {
+                        int value = accumulator[i, j, k];
+                        if (value > max)
+                        {
+                            max = value;
+                            mx = i;
+                            my = j;
+                            mr = k;
+                        }
+                    });
+                });
+            });
+
+        }
+
+        public void DetectLines()
+        {
+            byte[,] accumulator = CreateAccumulator(Width, Height);
+
+            for (int i = 0; i < Width; i++)
+            {
+                for (int j = 0; j < Height; j++)
+                {
+                    byte pixel = this[i, j].R;
+
+                    if (pixel != 255)
+                        DrawSin(i, j, accumulator);
+                }
+            }
+
+            int m = 0;
+            int mi = -1;
+            int mj = -1;
+            for (int i = 0; i < accumulator.GetLength(0); i++)
+            {
+                for (int j = 0; j < accumulator.GetLength(1); j++)
+                {
+                    byte b = accumulator[i, j];
+                    if (b > m)
+                    {
+                        m = b;
+                        mi = i;
+                        mj = j;
+                    }
+                }
+            }
+
+        }
+
+        private int CalculateR(int x, int y, double phi)
+        {
+            double cos = y * Math.Cos(phi);
+            double sin = x * Math.Sin(phi);
+
+            double R = cos + sin;
+
+            return Convert.ToInt32(R);
+        }
+
+        private byte[,] CreateAccumulator(int r, int c)
+        {
+            const int degs = 360;
+            int R = Convert.ToInt32(Math.Sqrt(r * r + c * c));
+
+            var acc = new byte[degs, R];
+
+            return acc;
+        }
+
+        private void DrawSin(int x, int y, byte[,] acc)
+        {
+            int degOffset = -90;
+
+            if (acc == null) return;
+
+            for (int i = 0; i < acc.GetLength(0); i++)
+            {
+                int r = CalculateR(x, y, DegsToRad(i + degOffset));
+
+                if (r < acc.GetLength(1) && r >= 0)
+                    acc[i, r]++;
+            }
+        }
+
+        private double DegsToRad(double angleInDegrees)
+        {
+            double rad = angleInDegrees * (Math.PI / 180.0);
+
+            return rad;
+        }
     }
 }
